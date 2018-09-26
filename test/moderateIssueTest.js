@@ -7,7 +7,7 @@ describe("ModerateIssue", function() {
 
   describe("moderateIssue", function() {
     it("should OK", function() {
-      assert.ok(true);
+      assert.ok(false);
     });
   });
 });
