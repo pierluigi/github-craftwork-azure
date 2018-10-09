@@ -5,6 +5,8 @@ const pem = Buffer.from(process.env["APP_PEM"] || "", "base64").toString();
 
 const octokit = require("@octokit/rest")();
 const jsonwebtoken = require("jsonwebtoken");
+const request = require('request');
+const querystring = require('querystring');
 
 function generateJwtToken() {
   // Sign with RSA SHA256
@@ -19,12 +21,45 @@ function generateJwtToken() {
   );
 }
 
-async function postIssueComment(
+function getLuisIntent(utterance) {
+
+  const endpoint =
+    "https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/";
+  const luisAppId = process.env.LUIS_APP_ID;
+  const endpointKey = process.env.LUIS_ENDPOINT_KEY;
+
+  var queryParams = {
+    "verbose": true,
+    "q": utterance,
+    "subscription-key": endpointKey
+  }
+
+  var luisRequest =
+    endpoint + luisAppId +
+    '?' + querystring.stringify(queryParams);
+
+  return new Promise((resolve, reject) => {
+    request(luisRequest,
+      function (err,
+        response, body) {
+
+        if (err)
+          reject(err)
+        else {
+          var data = JSON.parse(body);
+          resolve(data.topScoringIntent.intent.toLowerCase());
+        }
+      })
+  }
+  );
+}
+
+async function addLabels(
   installationId,
   owner,
   repository,
   number,
-  action
+  title
 ) {
   // Create bearer token and initial authentication session
   await octokit.authenticate({
@@ -42,19 +77,22 @@ async function postIssueComment(
   // Finally authenticate as the app
   octokit.authenticate({ type: "token", token });
 
-  var result = await octokit.issues.createComment({
+  const label = await getLuisIntent(title);
+
+  var result = await octokit.issues.addLabels({
     owner,
     repo: repository,
     number,
-    body: `Hello from Azure Functions! Action is \`${action}\` for appId \`${appId}\`.`
+    labels: [label]
   });
   return result;
 }
 
-module.exports = async function(context, data) {
+module.exports = async function (context, data) {
   const body = data.body;
   const action = body.action;
   const number = body.issue.number;
+  const title = body.issue.title;
   const repository = body.repository.name;
   const owner = body.repository.owner.login;
   const installationId = body.installation.id;
@@ -62,12 +100,12 @@ module.exports = async function(context, data) {
   try {
     var response = "";
     if (action === "opened") {
-      response = await postIssueComment(
+      response = await addLabels(
         installationId,
         owner,
         repository,
         number,
-        action
+        title
       );
     }
     context.res = {
