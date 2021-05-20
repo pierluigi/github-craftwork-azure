@@ -27,7 +27,7 @@ describe("ModerateIssue", function() {
     await moderateIssue({}, { body: issueOpenedPayload })
 
     sinon.assert.calledWith(createCommentStub, {
-      body: "Thanks for submitting this issue. We will take a look at it!",
+      body: "Just to say Hi",
       number: issueOpenedPayload.issue.number,
       owner: issueOpenedPayload.repository.owner.login,
       repo: issueOpenedPayload.repository.name
